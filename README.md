@@ -26,12 +26,7 @@ git clone https://github.com/zero-0x01/Echomotion.git
 cd Echomotion
 ```
 
-### 2. Configure Environment Variables
-```env
-MONGODB_URI=mongodb://localhost:27017/emotion_db
-```
-
-### 3. Run the main.py
+### 2. Run the main.py
 ```python
 python main.py
 ```
