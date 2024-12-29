@@ -53,8 +53,7 @@ emotion_map = {
     'normal2': 'Calm',
     'mutlu': 'Happy',
     'mutlu2': 'Happy',
-    'uzgun': 'Sad',
-    # Gerekirse daha fazla haritalama ekleyin
+    'uzgun': 'Sad'
 }
 
 # Özellik Çıkarım Fonksiyonu (Geliştirilmiş)
@@ -147,8 +146,7 @@ def augment_data(y, sr, config):
             n_steps = augmentation_config.get('pitch_steps', 2)
             y_pitch = librosa.effects.pitch_shift(y=y, sr=sr, n_steps=n_steps)
             augmented_data.append(y_pitch)
-        
-        # Diğer veri artırma tekniklerini ekleyebilirsiniz
+      
         
         return augmented_data
     except Exception as e:
