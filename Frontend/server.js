@@ -4,6 +4,7 @@ const pageRouter = require("./routes/pages");
 const apiRouter = require("./routes/api");
 const MongoStore = require('connect-mongo');
 
+require('dotenv').config()
 const path = require('path');
 
 
@@ -12,7 +13,7 @@ const path = require('path');
 const app = express();
 
 
-
+const mongo_uri = process.env.MONGODB_URI;
 
 
 app.use(express.json());
@@ -23,7 +24,7 @@ app.use(
     secret: 'Secret',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: 'your_mongofb_credentials' }),
+    store: MongoStore.create({ mongoUrl: mongo_uri }),
   })
 )
 
