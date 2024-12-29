@@ -11,7 +11,6 @@ from flask_socketio import SocketIO, emit
 import logging
 import io
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -24,7 +23,7 @@ socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
 
 # Load Pre-trained Model, Preprocessing Pipeline, and Label Encoder
 try:
-    model = load_model('models/best_model.keras')
+    model = load_model('models/emotion_recognition_model_turev.keras')
     preprocessing_pipeline = joblib.load('models/preprocessing_pipeline.joblib')
     label_classes = np.load('models/label_encoder_classes_turev.npy', allow_pickle=True)
     logger.info("Model, preprocessing pipeline, and label encoder loaded successfully.")
@@ -36,23 +35,23 @@ except Exception as e:
 config = {
     'data': {
         'sample_rate': 16000,
-        'n_mfcc': 16,  # Adjust this based on training
-        'expected_feature_size': 52,  # Set expected features
+        'n_mfcc': 32,  # Increased based on training to extract more features
+        'expected_feature_size': 190,  # Set expected features to match scaler
         'feature_extraction': {
             'include_delta': True,
             'include_delta_delta': True,
             'pitch': True,
             'energy': True,
             'zcr': True,
-            'spectral_centroid': True,  # Added to make additional features=4
-            'spectral_contrast': False,
-            'mel_spectrogram': False,
+            'spectral_centroid': True,  
+            'spectral_contrast': True,  # Enabled to extract more features
+            'mel_spectrogram': True,    # Enabled to extract more features
         }
     }
 }
 
 # Feature Extraction Function
-def extract_features_from_audio(audio, sr, config):
+def extract_features_from_audio(audio, sr, config, scaler=None):
     try:
         # Extract MFCCs
         mfccs = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=config['data']['n_mfcc'], n_fft=2048)
@@ -67,7 +66,7 @@ def extract_features_from_audio(audio, sr, config):
             mfccs_delta2 = librosa.feature.delta(mfccs, order=2)
             mfccs = np.vstack((mfccs, mfccs_delta2))
             logger.info(f"Included Delta-Delta MFCCs: {mfccs_delta2.shape}")
-        
+
         # Mean of MFCCs across time frames
         mfccs_mean = np.mean(mfccs, axis=1)
         logger.info(f"MFCCs mean shape: {mfccs_mean.shape}")  # Should be (n_mfcc*3,)
@@ -75,37 +74,50 @@ def extract_features_from_audio(audio, sr, config):
         # Additional Features
         fe_config = config['data']['feature_extraction']
         additional_features = []
-        
+
         if fe_config.get('pitch', False):
             pitch, _ = librosa.piptrack(y=audio, sr=sr)
             pitch_mean = np.mean(pitch[pitch > 0]) if np.any(pitch > 0) else 0
             additional_features.append(pitch_mean)
             logger.info(f"Pitch mean: {pitch_mean}")
-        
+
         if fe_config.get('energy', False):
             energy = np.sum(librosa.feature.rms(y=audio))
             additional_features.append(energy)
             logger.info(f"Energy: {energy}")
-        
+
         if fe_config.get('zcr', False):
             zcr = np.mean(librosa.feature.zero_crossing_rate(y=audio))
             additional_features.append(zcr)
             logger.info(f"ZCR: {zcr}")
-        
+
         if fe_config.get('spectral_centroid', False):
             spectral_centroid = np.mean(librosa.feature.spectral_centroid(y=audio, sr=sr))
             additional_features.append(spectral_centroid)
             logger.info(f"Spectral Centroid: {spectral_centroid}")
-        
+
+        if fe_config.get('spectral_contrast', False):
+            spectral_contrast = librosa.feature.spectral_contrast(y=audio, sr=sr)
+            spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
+            additional_features.extend(spectral_contrast_mean)
+            logger.info(f"Spectral Contrast Mean: {spectral_contrast_mean.shape}")
+
+        if fe_config.get('mel_spectrogram', False):
+            mel_spectrogram = librosa.feature.melspectrogram(y=audio, sr=sr)
+            mel_spectrogram_db = librosa.power_to_db(mel_spectrogram, ref=np.max)
+            mel_spectrogram_mean = np.mean(mel_spectrogram_db, axis=1)
+            additional_features.extend(mel_spectrogram_mean)
+            logger.info(f"Mel Spectrogram Mean: {mel_spectrogram_mean.shape}")
+
         # Combine all features
         features = np.hstack((mfccs_mean, additional_features))
-        logger.info(f"Combined feature vector shape: {features.shape}")  # Should be (52,)
+        logger.info(f"Combined feature vector shape: {features.shape}")  # Should be (190,)
 
         # Log feature vector size before scaling
         logger.info(f"Feature vector size before scaling: {len(features)}")
 
         # Define expected feature size
-        expected_feature_size = config['data'].get('expected_feature_size', 52)  # Default to 52
+        expected_feature_size = config['data'].get('expected_feature_size', 190)  # Updated to 190
 
         # Ensure the feature size matches the expected size by the StandardScaler
         actual_feature_size = len(features)
@@ -133,21 +145,21 @@ def process_audio(audio_bytes):
         # Convert bytes to NumPy array
         audio_buffer = io.BytesIO(audio_bytes)
         audio, sr = sf.read(audio_buffer, dtype='float32')
-        
+
         # Log audio length
         logger.info(f"Received audio with {len(audio)} samples.")
-        
+
         # Check if audio has at least 2048 samples
         if len(audio) < 2048:
             logger.warning(f"Received audio data is too short: {len(audio)} samples. Skipping processing.")
             return None
-        
+
         # Resample if necessary
         if sr != config['data']['sample_rate']:
             audio = librosa.resample(audio, orig_sr=sr, target_sr=config['data']['sample_rate'])
             sr = config['data']['sample_rate']
             logger.info(f"Resampled audio to {sr} Hz.")
-        
+
         # Extract Features
         features = extract_features_from_audio(audio, sr, config)
         if features is not None:
@@ -206,7 +218,7 @@ def handle_audio_data(data):
         else:
             emit('emotion_data', {'emotions': {}})
             logger.warning("No emotions detected. Emitted empty emotions.")
-        
+
         return 'ok'  # Acknowledge the client
     except Exception as e:
         logger.error(f"Exception in handle_audio_data: {e}")

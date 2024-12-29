@@ -8,6 +8,8 @@ Model/Datasets/
 Model/venv/
 Model/*.h5
 Model/*.pth
+Model/logs/
+Model/models/
 
 # OS and Editor Specific
 .DS_Store

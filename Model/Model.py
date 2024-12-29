@@ -8,37 +8,38 @@ import joblib
 import logging
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.metrics import classification_report, hamming_loss, f1_score
+from sklearn.metrics import classification_report, hamming_loss, f1_score, confusion_matrix
 from sklearn.utils.class_weight import compute_class_weight
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import (Input, Conv1D, MaxPooling1D, Bidirectional, LSTM,
-                                     Dense, Dropout, Flatten)
+                                     Dense, Dropout, Flatten, Multiply, Permute, RepeatVector)
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.regularizers import l2
 from tensorflow.keras.models import load_model
+import tensorflow.keras.backend as K
 
-# Load configuration
+# Konfigürasyon dosyasını yükle
 with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
-# Ensure necessary directories exist
+# Gerekli klasörlerin varlığını sağla
 os.makedirs('models', exist_ok=True)
 os.makedirs('logs', exist_ok=True)
 
-# Setup logging
+# Loglama ayarlarını yap
 logging.basicConfig(
     filename=config['logging']['file'],
-    level=getattr(logging, config['logging']['level']),
+    level=getattr(logging, config['logging']['level'].upper(), logging.INFO),
     format='%(asctime)s:%(levelname)s:%(message)s'
 )
 logger = logging.getLogger()
 
-# Disable oneDNN optimizations (if you are encountering any related warnings)
+# oneDNN optimizasyonlarını devre dışı bırak (ilgili uyarılar alıyorsanız)
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
-# Define emotion mapping (standardize label mapping across datasets)
+# Duygu haritasını tanımla (veri setleri arasında etiketleri standardize etmek için)
 emotion_map = {
     'Angry': 'Angry',
     'Sad': 'Sad',
@@ -53,18 +54,16 @@ emotion_map = {
     'mutlu': 'Happy',
     'mutlu2': 'Happy',
     'uzgun': 'Sad',
-    # Add more mappings if necessary
+    # Gerekirse daha fazla haritalama ekleyin
 }
 
-# Feature Extraction Function with Enhancements
-def extract_features(file_path, config, scaler=None):
+# Özellik Çıkarım Fonksiyonu (Geliştirilmiş)
+def extract_features(y, sr, config, scaler=None):
     try:
-        y, sr = librosa.load(file_path, sr=config['data']['sample_rate'])
-        
-        # Extract MFCCs
+        # MFCC'leri çıkar
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=config['data']['n_mfcc'])
         
-        # Include delta and delta-delta MFCCs if specified
+        # Delta ve delta-delta MFCC'leri dahil et
         if config['data']['feature_extraction']['include_delta']:
             mfccs_delta = librosa.feature.delta(mfccs)
             mfccs = np.vstack((mfccs, mfccs_delta))
@@ -74,39 +73,39 @@ def extract_features(file_path, config, scaler=None):
         
         mfccs_mean = np.mean(mfccs, axis=1)
         
-        # Initialize feature list
+        # Özellik listesini başlat
         features = [mfccs_mean]
         
-        # Additional Features
-        fe_config = config['data']['feature_extraction']
-        if fe_config.get('pitch', False):
-            pitch, mag = librosa.core.piptrack(y=y, sr=sr)
+        # Ekstra Özellikler
+        additional_features = config['data']['feature_extraction']['additional_features']
+        if additional_features.get('pitch', False):
+            pitch, _ = librosa.core.piptrack(y=y, sr=sr)
             pitch_mean = np.mean(pitch[pitch > 0]) if np.any(pitch > 0) else 0
             features.append(pitch_mean)
         
-        if fe_config.get('energy', False):
+        if additional_features.get('energy', False):
             energy = np.sum(librosa.feature.rms(y=y))
             features.append(energy)
         
-        if fe_config.get('zcr', False):
+        if additional_features.get('zcr', False):
             zcr = librosa.feature.zero_crossing_rate(y=y)
             zcr_mean = np.mean(zcr)
             features.append(zcr_mean)
         
-        if fe_config.get('spectral_contrast', False):
+        if additional_features.get('spectral_contrast', False):
             spectral_contrast = librosa.feature.spectral_contrast(y=y, sr=sr)
             spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
             features.extend(spectral_contrast_mean)
         
-        if fe_config.get('mel_spectrogram', False):
+        if additional_features.get('mel_spectrogram', False):
             mel_spectrogram = librosa.feature.melspectrogram(y=y, sr=sr)
             mel_spectrogram_mean = np.mean(mel_spectrogram, axis=1)
             features.extend(mel_spectrogram_mean)
         
-        # Combine all features into a single vector
+        # Tüm özellikleri tek bir vektörde birleştir
         features = np.hstack(features)
         
-        # Feature Scaling
+        # Özellik Ölçeklendirme
         if scaler:
             features = scaler.transform([features])[0]
         else:
@@ -115,192 +114,187 @@ def extract_features(file_path, config, scaler=None):
         
         return features, scaler
     except Exception as e:
-        logger.error(f"Error processing {file_path}: {e}")
+        logger.error(f"Özellik çıkarımında hata: {e}")
         return None, None
 
-# Data Augmentation Function (Updated)
-def augment_data(y, sr):
+# Veri Artırma Fonksiyonu (Güncellenmiş)
+def augment_data(y, sr, config):
     augmented_data = []
     try:
-        # Example Augmentations: Add noise, time stretching, pitch shifting
-        # Add Gaussian noise
-        noise = np.random.randn(len(y))
-        y_noise = y + 0.005 * noise
-        augmented_data.append(y_noise)
+        # Veri artırma ayarlarını al
+        augmentation_config = config['data']['augmentation']
         
-        # Time stretching
-        y_stretch = librosa.effects.time_stretch(y=y, rate=1.1)
-        augmented_data.append(y_stretch)
+        # Gürültü ekleme
+        if augmentation_config.get('add_noise', False):
+            noise = np.random.randn(len(y))
+            noise_amp = augmentation_config.get('noise_amplitude', 0.005)
+            y_noise = y + noise_amp * noise
+            augmented_data.append(y_noise)
         
-        # Pitch shifting with keyword arguments
-        y_pitch = librosa.effects.pitch_shift(y=y, sr=sr, n_steps=2)
-        augmented_data.append(y_pitch)
+        # Zaman esnetme
+        if augmentation_config.get('time_stretch', False):
+            rate = augmentation_config.get('stretch_rate', 1.1)
+            y_stretch = librosa.effects.time_stretch(y=y, rate=rate)
+            # Esnetilen sinyalin aynı uzunlukta olmasını sağla
+            if len(y_stretch) > len(y):
+                y_stretch = y_stretch[:len(y)]
+            else:
+                y_stretch = np.pad(y_stretch, (0, max(0, len(y) - len(y_stretch))), 'constant')
+            augmented_data.append(y_stretch)
+        
+        # Pitch kaydırma
+        if augmentation_config.get('pitch_shift', False):
+            n_steps = augmentation_config.get('pitch_steps', 2)
+            y_pitch = librosa.effects.pitch_shift(y=y, sr=sr, n_steps=n_steps)
+            augmented_data.append(y_pitch)
+        
+        # Diğer veri artırma tekniklerini ekleyebilirsiniz
         
         return augmented_data
     except Exception as e:
-        logger.error(f"Error in data augmentation: {e}")
+        logger.error(f"Veri artırmada hata: {e}")
         return augmented_data
 
-# Process the Turev-DB dataset (folder-based structure)
+# Turev-DB veri setini işleme fonksiyonu (klasör tabanlı yapı)
 def process_turev_db(data_dir, config):
     features = []
     labels = []
-    scaler = None  # To store the scaler after first feature extraction
+    scaler = None  # İlk özellik çıkarımdan sonra ölçekleyici saklanacak
     
-    # Iterate through each emotion folder
+    # Her duygu klasörünü dolaş
     for emotion in os.listdir(data_dir):
         emotion_path = os.path.join(data_dir, emotion)
         if os.path.isdir(emotion_path):
             for file_name in os.listdir(emotion_path):
                 if file_name.endswith('.wav'):
                     file_path = os.path.join(emotion_path, file_name)
-                    # Extract features
-                    feat, scaler = extract_features(file_path, config, scaler)
-                    if feat is not None:
-                        features.append(feat)
-                        labels.append(emotion_map.get(emotion, 'Neutral'))  # Default to 'Neutral' if not mapped
-                        
-                        # Data Augmentation (Optional)
+                    try:
+                        # Ses dosyasını yükle
                         y, sr = librosa.load(file_path, sr=config['data']['sample_rate'])
-                        augmented_samples = augment_data(y, sr)
-                        for augmented_y in augmented_samples:
-                            # Extract features from augmented data
-                            # Note: Not saving augmented audio files
-                            # Directly process the augmented signal
-                            
-                            # Extract MFCCs
-                            mfccs = librosa.feature.mfcc(y=augmented_y, sr=sr, n_mfcc=config['data']['n_mfcc'])
-                            if config['data']['feature_extraction']['include_delta']:
-                                mfccs_delta = librosa.feature.delta(mfccs)
-                                mfccs = np.vstack((mfccs, mfccs_delta))
-                            if config['data']['feature_extraction']['include_delta_delta']:
-                                mfccs_delta2 = librosa.feature.delta(mfccs, order=2)
-                                mfccs = np.vstack((mfccs, mfccs_delta2))
-                            mfccs_mean = np.mean(mfccs, axis=1)
-                            
-                            augmented_features = [mfccs_mean]
-                            
-                            # Additional Features
-                            fe_config = config['data']['feature_extraction']
-                            if fe_config.get('pitch', False):
-                                pitch, mag = librosa.core.piptrack(y=augmented_y, sr=sr)
-                                pitch_mean = np.mean(pitch[pitch > 0]) if np.any(pitch > 0) else 0
-                                augmented_features.append(pitch_mean)
-                            
-                            if fe_config.get('energy', False):
-                                energy = np.sum(librosa.feature.rms(y=augmented_y))
-                                augmented_features.append(energy)
-                            
-                            if fe_config.get('zcr', False):
-                                zcr = librosa.feature.zero_crossing_rate(y=augmented_y)
-                                zcr_mean = np.mean(zcr)
-                                augmented_features.append(zcr_mean)
-                            
-                            if fe_config.get('spectral_contrast', False):
-                                spectral_contrast = librosa.feature.spectral_contrast(y=augmented_y, sr=sr)
-                                spectral_contrast_mean = np.mean(spectral_contrast, axis=1)
-                                augmented_features.extend(spectral_contrast_mean)
-                            
-                            if fe_config.get('mel_spectrogram', False):
-                                mel_spectrogram = librosa.feature.melspectrogram(y=augmented_y, sr=sr)
-                                mel_spectrogram_mean = np.mean(mel_spectrogram, axis=1)
-                                augmented_features.extend(mel_spectrogram_mean)
-                            
-                            # Combine all features into a single vector
-                            augmented_features = np.hstack(augmented_features)
-                            
-                            # Feature Scaling
-                            if scaler:
-                                augmented_features = scaler.transform([augmented_features])[0]
-                            else:
-                                scaler = StandardScaler()
-                                augmented_features = scaler.fit_transform([augmented_features])[0]
-                            
-                            features.append(augmented_features)
-                            labels.append(emotion_map.get(emotion, 'Neutral'))
+                        
+                        # Orijinal veriden özellikleri çıkar
+                        feat, scaler = extract_features(y, sr, config, scaler)
+                        if feat is not None:
+                            features.append(feat)
+                            labels.append(emotion_map.get(emotion, 'Neutral'))  # Harita yoksa 'Neutral' olarak ata
+                        
+                        # Veri Artırma (Opsiyonel)
+                        augmentation_config = config['data']['augmentation']
+                        if augmentation_config.get('enable', False):
+                            augmented_samples = augment_data(y, sr, config)
+                            for augmented_y in augmented_samples:
+                                feat_aug, scaler = extract_features(augmented_y, sr, config, scaler)
+                                if feat_aug is not None:
+                                    features.append(feat_aug)
+                                    labels.append(emotion_map.get(emotion, 'Neutral'))
+                    except Exception as e:
+                        logger.error(f"{file_path} dosyasını işlerken hata: {e}")
     
     return features, labels, scaler
 
-# Load and Process Data
+# Veriyi yükleme ve işleme fonksiyonu
 def load_data(config):
     data_dir = config['data']['dataset_path']
     features, labels, scaler = process_turev_db(data_dir, config)
     X = np.array(features)
     y = np.array(labels)
-    logger.info(f"Extracted Features Shape: {X.shape}")
-    logger.info(f"Labels Shape: {y.shape}")
+    logger.info(f"Çıkarılan Özelliklerin Şekli: {X.shape}")
+    logger.info(f"Etiketlerin Şekli: {y.shape}")
     return X, y, scaler
 
-# Encode Labels for Multi-Label Classification
+# Çoklu Sınıf Sınıflandırma için Etiketleri Kodlama
 def encode_labels(y):
     label_encoder = LabelEncoder()
     y_numeric = label_encoder.fit_transform(y)
     y_cat = to_categorical(y_numeric, num_classes=len(label_encoder.classes_))
     return y_cat, label_encoder
 
-# Split Dataset
+# Veri Setini Bölme Fonksiyonu
 def split_dataset(X, y, config):
+    test_size = config['training']['test_size']
+    validation_split = config['training']['validation_split']
+    
+    # Eğitim ve geçici seti ayır
     X_train, X_temp, y_train, y_temp = train_test_split(
-        X, y, test_size=config['training']['test_size'],
+        X, y, test_size=test_size,
         random_state=42, stratify=y
     )
+    # Geçici seti doğrulama ve test setine ayır
+    val_size = validation_split / (1 - test_size)  # Doğrulama boyutunu ayarla
     X_val, X_test, y_val, y_test = train_test_split(
-        X_temp, y_temp, test_size=config['training']['validation_split'],
+        X_temp, y_temp, test_size=val_size,
         random_state=42, stratify=y_temp
     )
-    logger.info(f"Training Set Shape: {X_train.shape}, {y_train.shape}")
-    logger.info(f"Validation Set Shape: {X_val.shape}, {y_val.shape}")
-    logger.info(f"Test Set Shape: {X_test.shape}, {y_test.shape}")
+    logger.info(f"Eğitim Setinin Şekli: {X_train.shape}, {y_train.shape}")
+    logger.info(f"Doğrulama Setinin Şekli: {X_val.shape}, {y_val.shape}")
+    logger.info(f"Test Setinin Şekli: {X_test.shape}, {y_test.shape}")
     return X_train, X_val, X_test, y_train, y_val, y_test
 
-# Build Model with Attention Mechanism
+# Dikkat Katmanı Fonksiyonu (Opsiyonel)
+def attention_3d_block(inputs, config):
+    # Girdilerin şekli: (batch_size, time_steps, input_dim)
+    time_steps = int(inputs.shape[1])
+    input_dim = int(inputs.shape[2])
+    
+    # Dikkat mekanizması için yoğun katmanlar
+    a = Dense(config['model']['attention_units'], activation='tanh')(inputs)
+    a = Dense(1, activation='softmax')(a)
+    a = Flatten()(a)
+    a = RepeatVector(input_dim)(a)
+    a = Permute([2, 1])(a)
+    
+    # Girdi ile dikkat ağırlıklarını çarp
+    output_attention_mul = Multiply()([inputs, a])
+    return output_attention_mul
+
+# Model Oluşturma Fonksiyonu (Opsiyonel Dikkat Mekanizması ile)
 def build_model(input_shape, num_classes, config):
     inputs = Input(shape=input_shape)
     
-    # Convolutional Layers with Regularization
-    x = Conv1D(filters=config['model']['conv_layers'][0]['filters'],
-               kernel_size=config['model']['conv_layers'][0]['kernel_size'],
-               activation=config['model']['conv_layers'][0]['activation'],
-               kernel_regularizer=l2(0.001))(inputs)
-    x = MaxPooling1D(pool_size=config['model']['conv_layers'][0]['pool_size'])(x)
+    # Konvolüsyon Katmanları ve Havuzlama
+    x = inputs
+    for conv_layer in config['model']['conv_layers']:
+        x = Conv1D(filters=conv_layer['filters'],
+                   kernel_size=conv_layer['kernel_size'],
+                   activation=conv_layer['activation'],
+                   kernel_regularizer=l2(conv_layer.get('l2', 0.001)),
+                   padding='same')(x)
+        x = MaxPooling1D(pool_size=conv_layer['pool_size'])(x)
     
-    x = Conv1D(filters=config['model']['conv_layers'][1]['filters'],
-               kernel_size=config['model']['conv_layers'][1]['kernel_size'],
-               activation=config['model']['conv_layers'][1]['activation'],
-               kernel_regularizer=l2(0.001))(x)
-    x = MaxPooling1D(pool_size=config['model']['conv_layers'][1]['pool_size'])(x)
+    # Bidirectional LSTM Katmanları
+    for lstm_layer in config['model']['lstm_layers']:
+        x = Bidirectional(LSTM(lstm_layer['units'], return_sequences=lstm_layer.get('return_sequences', False)))(x)
     
-    # Bidirectional LSTM Layers
-    x = Bidirectional(LSTM(config['model']['lstm_units'], return_sequences=True))(x)
-    x = Bidirectional(LSTM(config['model']['lstm_units']))(x)
+    # Dikkat Mekanizması (Opsiyonel)
+    if config['model']['use_attention']:
+        x = attention_3d_block(x, config)
+        x = Flatten()(x)
     
-    # Attention Mechanism
-    attention = Dense(64, activation='tanh')(x)
-    attention = Dense(1, activation='softmax')(attention)
-    attention = Flatten()(attention)
-    context_vector = x * attention
+    # Tam Bağlantılı Katmanlar
+    for dense_layer in config['model']['dense_layers']:
+        x = Dense(dense_layer['units'], activation=dense_layer['activation'],
+                  kernel_regularizer=l2(dense_layer.get('l2', 0.001)))(x)
+        if 'dropout' in dense_layer:
+            x = Dropout(dense_layer['dropout'])(x)
     
-    # Fully Connected Layers
-    x = Dense(config['model']['dense_units'], activation='relu')(context_vector)
-    x = Dropout(config['model']['dropout_rate'])(x)
-    
-    # Output Layer
+    # Çıktı Katmanı
     outputs = Dense(num_classes, activation=config['model']['output_activation'])(x)
     
-    # Define Model
+    # Modeli Tanımla
     model = Model(inputs=inputs, outputs=outputs)
     
-    # Compile Model
+    # Modeli Derle
     optimizer = Adam(learning_rate=config['model']['optimizer']['learning_rate'])
     model.compile(optimizer=optimizer, loss=config['model']['loss'], metrics=['accuracy'])
     
+    # Model özetini log dosyasına yaz
     model.summary(print_fn=lambda x: logger.info(x))
     
     return model
 
-# Train Model
+# Modeli Eğitme Fonksiyonu
 def train_model(model, X_train, y_train, X_val, y_val, config, class_weight):
-    # Callbacks
+    # Erken Durdurma ve Model Kontrol Noktası Geri Çağırma Ayarları
     early_stopping = EarlyStopping(
         monitor=config['training']['early_stopping']['monitor'],
         patience=config['training']['early_stopping']['patience'],
@@ -308,13 +302,13 @@ def train_model(model, X_train, y_train, X_val, y_val, config, class_weight):
     )
     
     checkpoint = ModelCheckpoint(
-        filepath='models/best_model.keras',  # Use .h5 extension
+        filepath=config['deployment']['model_save_path'],
         monitor='val_loss',
         save_best_only=True,
-        verbose=1,
-        # Remove 'save_format' to ensure compatibility
+        verbose=1
     )
     
+    # Modeli Eğit
     history = model.fit(
         X_train, y_train,
         epochs=config['training']['epochs'],
@@ -325,81 +319,129 @@ def train_model(model, X_train, y_train, X_val, y_val, config, class_weight):
         verbose=1
     )
     
+    # Eğitim geçmişini log dosyasına yaz
+    for epoch in range(len(history.history['loss'])):
+        logger.info(
+            f"Epoch {epoch+1}/{config['training']['epochs']}: "
+            f"loss={history.history['loss'][epoch]:.4f}, "
+            f"val_loss={history.history['val_loss'][epoch]:.4f}, "
+            f"accuracy={history.history['accuracy'][epoch]:.4f}, "
+            f"val_accuracy={history.history['val_accuracy'][epoch]:.4f}"
+        )
+    
     return history
 
-# Evaluate Model
+# Modeli Değerlendirme Fonksiyonu
 def evaluate_model(model, X_test, y_test, label_encoder):
+    # Test verisi üzerinde modeli değerlendir
     test_loss, test_accuracy = model.evaluate(X_test, y_test, verbose=0)
-    logger.info(f"Test Loss: {test_loss}")
-    logger.info(f"Test Accuracy: {test_accuracy}")
+    logger.info(f"Test Kayıp: {test_loss}")
+    logger.info(f"Test Doğruluk: {test_accuracy}")
     
-    # Predictions
+    # Tahminleri al
     y_pred = model.predict(X_test)
-    y_pred_binary = (y_pred > 0.5).astype(int)
-    y_true = y_test.argmax(axis=1)
-    y_pred_classes = y_pred_binary.argmax(axis=1)
+    y_pred_classes = np.argmax(y_pred, axis=1)
+    y_true = np.argmax(y_test, axis=1)
     
-    # Classification Report
+    # Sınıflandırma Raporu
     report = classification_report(y_true, y_pred_classes, target_names=label_encoder.classes_)
-    logger.info("Classification Report:\n" + report)
+    logger.info("Sınıflandırma Raporu:\n" + report)
     
-    # Additional Metrics
-    ham_loss = hamming_loss(y_test, y_pred_binary)
-    f1_micro = f1_score(y_test, y_pred_binary, average='micro')
-    f1_macro = f1_score(y_test, y_pred_binary, average='macro')
+    # Ek Metrikler
+    ham_loss = hamming_loss(y_test, to_categorical(y_pred_classes, num_classes=y_test.shape[1]))
+    f1_micro = f1_score(y_test, to_categorical(y_pred_classes, num_classes=y_test.shape[1]), average='micro')
+    f1_macro = f1_score(y_test, to_categorical(y_pred_classes, num_classes=y_test.shape[1]), average='macro')
     
-    logger.info(f"Hamming Loss: {ham_loss}")
-    logger.info(f"F1 Score (Micro): {f1_micro}")
-    logger.info(f"F1 Score (Macro): {f1_macro}")
+    logger.info(f"Hamming Kayıp: {ham_loss}")
+    logger.info(f"F1 Skoru (Micro): {f1_micro}")
+    logger.info(f"F1 Skoru (Macro): {f1_macro}")
+    
+    # Karışıklık Matrisi
+    cm = confusion_matrix(y_true, y_pred_classes)
+    logger.info(f"Karışıklık Matrisi:\n{cm}")
     
     return test_loss, test_accuracy, report, ham_loss, f1_micro, f1_macro
 
-# Save Label Encoder and Scaler
+# Ön İşlem Nesnelerini Kaydetme Fonksiyonu
 def save_preprocessing(label_encoder, scaler, config):
-    # Save label encoder
-    label_encoder_save_path = config['deployment']['label_encoder_save_path']
-    np.save(label_encoder_save_path, label_encoder.classes_)
-    logger.info(f"Label encoder classes saved to {label_encoder_save_path}")
-    
-    # Save scaler (preprocessing pipeline)
-    preprocessing_save_path = config['deployment']['preprocessing_save_path']
-    joblib.dump(scaler, preprocessing_save_path)
-    logger.info(f"Preprocessing scaler saved to {preprocessing_save_path}")
+    try:
+        # Etiket kodlayıcıyı kaydet
+        label_encoder_save_path = config['deployment']['label_encoder_save_path']
+        np.save(label_encoder_save_path, label_encoder.classes_)
+        logger.info(f"Etiket kodlayıcı sınıfları {label_encoder_save_path} yoluna kaydedildi.")
+        
+        # Ölçekleyiciyi kaydet
+        preprocessing_save_path = config['deployment']['preprocessing_save_path']
+        joblib.dump(scaler, preprocessing_save_path)
+        logger.info(f"Ön işleme ölçekleyici {preprocessing_save_path} yoluna kaydedildi.")
+    except Exception as e:
+        logger.error(f"Ön işleme nesnelerini kaydederken hata: {e}")
 
-# Main Function
+# Sınıf Ağırlıklarını Hesaplama Fonksiyonu
+def compute_weights(y_train):
+    try:
+        classes = np.unique(y_train)
+        class_weights = compute_class_weight(class_weight='balanced', classes=classes, y=y_train)
+        class_weight_dict = {i: weight for i, weight in enumerate(class_weights)}
+        logger.info(f"Hesaplanan sınıf ağırlıkları: {class_weight_dict}")
+        return class_weight_dict
+    except Exception as e:
+        logger.error(f"Sınıf ağırlıklarını hesaplarken hata: {e}")
+        return None
+
+# Ana Fonksiyon
 def main():
     try:
-        # Load and Process Data
+        # Veriyi yükle ve işle
         X, y, scaler = load_data(config)
         
-        # Encode Labels
+        # Veri ve etiketlerin boş olup olmadığını kontrol et
+        if len(X) == 0 or len(y) == 0:
+            logger.error("Çıkarılan özellikler veya etiketler boş. Veri setinizi ve özellik çıkarımını kontrol edin.")
+            return
+        
+        # Etiketleri kodla
         y_cat, label_encoder = encode_labels(y)
         
-        # Split Dataset
+        # Veri setini böl
         X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y_cat, config)
         
-        # Reshape for CNN input
+        # CNN girişi için veriyi yeniden şekillendir
         X_train_reshaped = X_train.reshape(X_train.shape[0], X_train.shape[1], 1)
         X_val_reshaped = X_val.reshape(X_val.shape[0], X_val.shape[1], 1)
         X_test_reshaped = X_test.reshape(X_test.shape[0], X_test.shape[1], 1)
         
-        # Update input shape in config
+        # Girdi şekli yapılandırmasını güncelle
         input_shape = (X_train_reshaped.shape[1], X_train_reshaped.shape[2])
         config['model']['input_shape'] = input_shape
         
-        # Build Model
+        # Sınıf ağırlıklarını hesapla
+        y_train_classes = np.argmax(y_train, axis=1)
+        class_weight_dict = compute_weights(y_train_classes)
         
-        # Load Best Model
-        model = load_model('models/best_model.keras')  # Load the best_model.h5
+        # Modeli oluştur
+        model = build_model(input_shape, y_cat.shape[1], config)
         
-        # Evaluate Model
-        evaluate_model(model, X_test_reshaped, y_test, label_encoder)
+        # Modeli eğit
+        history = train_model(model, X_train_reshaped, y_train, X_val_reshaped, y_val, config, class_weight=class_weight_dict)
         
-        # Save Label Encoder and Scaler
+        # En iyi modeli yükle
+        best_model_path = config['deployment']['model_save_path']
+        if os.path.exists(best_model_path):
+            best_model = load_model(best_model_path)
+            logger.info(f"En iyi model {best_model_path} yolundan yüklendi.")
+        else:
+            logger.error(f"En iyi model dosyası {best_model_path} yolunda bulunamadı. Değerlendirme atlanıyor.")
+            return
+        
+        # Modeli değerlendir
+        evaluate_model(best_model, X_test_reshaped, y_test, label_encoder)
+        
+        # Etiket kodlayıcı ve ölçekleyiciyi kaydet
         save_preprocessing(label_encoder, scaler, config)
         
     except Exception as e:
-        logger.error(f"An error occurred: {e}")
+        logger.error(f"Ana fonksiyonda hata oluştu: {e}")
 
 if __name__ == "__main__":
     main()

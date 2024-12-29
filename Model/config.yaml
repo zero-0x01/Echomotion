@@ -1,53 +1,83 @@
 # config.yaml
-data:
-  dataset_path: 'Datasets/Turev'
-  sample_rate: 16000
-  n_mfcc: 13
-  feature_extraction:
-    include_delta: true
-    include_delta_delta: true
-    additional_features:
-      pitch: true
-      energy: true
-      zcr: true
-      spectral_contrast: true
-      mel_spectrogram: true
-
-model:
-  input_shape: null  # To be set dynamically
-  conv_layers:
-    - filters: 64
-      kernel_size: 3
-      activation: 'relu'
-      pool_size: 2
-    - filters: 128
-      kernel_size: 3
-      activation: 'relu'
-      pool_size: 2
-  lstm_units: 128
-  dense_units: 128
-  dropout_rate: 0.5
-  output_activation: 'sigmoid'
-  loss: 'binary_crossentropy'
-  optimizer:
-    type: 'Adam'
-    learning_rate: 0.001
-
-training:
-  test_size: 0.3
-  validation_split: 0.5
-  batch_size: 32
-  epochs: 50
-  early_stopping:
-    monitor: 'val_loss'
-    patience: 10
-    restore_best_weights: true
-
-deployment:
-  model_save_path: 'models/emotion_recognition_model_turev'
-  label_encoder_save_path: 'models/label_encoder_classes_turev.npy'
-  preprocessing_save_path: 'models/preprocessing_pipeline.joblib'
 
 logging:
-  level: 'INFO'
-  file: 'logs/training.log'
+  file: "logs/training.log" # Eğitim sırasında oluşturulacak log dosyasının yolu
+  level: "INFO" # Loglama seviyesini belirler (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+
+data:
+  dataset_path: "Datasets/Turev" # Veri setinizin bulunduğu klasörün yolu
+  sample_rate: 16000 # Ses dosyalarının örnekleme hızı (Hz)
+  n_mfcc: 13 # MFCC (Mel-Frekans Cepstral Katsayıları) sayısı
+  feature_extraction:
+    include_delta: true # MFCC'lerin delta (ilk türev) özelliklerini dahil et
+    include_delta_delta: true # MFCC'lerin delta-delta (ikinci türev) özelliklerini dahil et
+    additional_features: # Ekstra özelliklerin dahil edilip edilmeyeceğini belirler
+      pitch: true # Pitch (ses tonu) özelliğini dahil et
+      energy: true # Enerji özelliğini dahil et
+      zcr: true # Sıfır Geçiş Oranı (Zero Crossing Rate) özelliğini dahil et
+      spectral_contrast: true # Spektral kontrast özelliğini dahil et
+      mel_spectrogram: true # Mel spektrogram özelliğini dahil et
+
+      # Aşağıdaki özellikler varsayılan olarak devre dışıdır. İhtiyaca göre etkinleştirilebilir.
+      chroma: false # Chroma özelliklerini dahil et (devre dışı)
+      spectral_rolloff: false # Spektral Rolloff özelliklerini dahil et (devre dışı)
+      tonnetz: false # Tonnetz özelliklerini dahil et (devre dışı)
+
+  augmentation:
+    enable: false # Veri artırmayı etkinleştir veya devre dışı bırak
+    add_noise: false # Gürültü eklemeyi etkinleştir
+    noise_amplitude: 0.005 # Eklenen gürültünün amplitüdü
+    time_stretch: false # Zaman esnetmeyi etkinleştir
+    stretch_rate: 1.1 # Zaman esnetme oranı
+    pitch_shift: false # Pitch kaydırmayı etkinleştir
+    pitch_steps: 2 # Pitch kaydırma adımı
+
+model:
+  conv_layers: # Konvolüsyon katmanlarının yapılandırması
+    - filters: 64 # İlk konvolüsyon katmanındaki filtre sayısı
+      kernel_size: 3 # İlk konvolüsyon katmanındaki çekirdek boyutu
+      activation: "relu" # İlk konvolüsyon katmanındaki aktivasyon fonksiyonu
+      pool_size: 2 # İlk konvolüsyon katmanındaki havuzlama boyutu
+      l2: 0.001 # İlk konvolüsyon katmanındaki L2 düzenlemesi
+    - filters: 128 # İkinci konvolüsyon katmanındaki filtre sayısı
+      kernel_size: 3 # İkinci konvolüsyon katmanındaki çekirdek boyutu
+      activation: "relu" # İkinci konvolüsyon katmanındaki aktivasyon fonksiyonu
+      pool_size: 2 # İkinci konvolüsyon katmanındaki havuzlama boyutu
+      l2: 0.001 # İkinci konvolüsyon katmanındaki L2 düzenlemesi
+
+  lstm_layers: # LSTM katmanlarının yapılandırması
+    - units: 128 # İlk LSTM katmanındaki birim sayısı
+      return_sequences: true # İlk LSTM katmanının çıktısının tüm sekansı döndürüp döndürmeyeceği
+    - units: 128 # İkinci LSTM katmanındaki birim sayısı
+      return_sequences: true # İkinci LSTM katmanının çıktısının tüm sekansı döndürüp döndürmeyeceği
+
+  attention_units: 64 # Dikkat mekanizmasındaki birim sayısı
+  use_attention: true # Dikkat mekanizmasını etkinleştir veya devre dışı bırak
+
+  dense_layers: # Tam bağlantılı katmanların yapılandırması
+    - units: 128 # İlk tam bağlantılı katmandaki birim sayısı
+      activation: "relu" # İlk tam bağlantılı katmandaki aktivasyon fonksiyonu
+      dropout: 0.5 # İlk tam bağlantılı katmandaki dropout oranı
+      l2: 0.001 # İlk tam bağlantılı katmandaki L2 düzenlemesi
+
+  output_activation: "sigmoid" # Çıktı katmanındaki aktivasyon fonksiyonu ('softmax' çoklu sınıf için)
+  loss: "binary_crossentropy" # Kayıp fonksiyonu ('categorical_crossentropy' çoklu sınıf için)
+
+  optimizer:
+    type: "Adam" # Kullanılacak optimizasyon algoritması
+    learning_rate: 0.001 # Öğrenme hızı
+
+training:
+  test_size: 0.3 # Verinin test setine ayrılma oranı (30%)
+  validation_split: 0.5 # Eğitim verisinin doğrulama setine ayrılma oranı (yarısı)
+  batch_size: 32 # Eğitim sırasında kullanılacak mini-batch boyutu
+  epochs: 50 # Eğitim döngüsü sayısı
+  early_stopping:
+    monitor: "val_loss" # İzlenecek metrik (doğrulama kaybı)
+    patience: 10 # İyileşme olmazsa eğitimin durdurulacağı epoch sayısı
+    restore_best_weights: true # En iyi ağırlıkların geri yükleneceğini belirtir
+
+deployment:
+  model_save_path: "models/emotion_recognition_model_turev.keras" # Eğitilen modelin kaydedileceği yol
+  label_encoder_save_path: "models/label_encoder_classes_turev.npy" # Etiket kodlayıcının (label encoder) kaydedileceği yol
+  preprocessing_save_path: "models/preprocessing_pipeline.joblib" # Ön işleme ölçekleyicisinin kaydedileceği yol
