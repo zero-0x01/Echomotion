@@ -23,7 +23,7 @@ app.use(
     secret: 'Secret',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: 'mongodb+srv://mhagapour:kU8bHgTk3pyUCLWn@lamasocial.dpvijct.mongodb.net/AI_db?retryWrites=true&w=majority&appName=lamasocial' }),
+    store: MongoStore.create({ mongoUrl: 'your_mongofb_credentials' }),
   })
 )
 
