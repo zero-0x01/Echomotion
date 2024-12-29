@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://mhagapour:kU8bHgTk3pyUCLWn@lamasocial.dpvijct.mongodb.net/AI_db?retryWrites=true&w=majority&appName=lamasocial', {
+mongoose.connect('Your_mongodb', {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 })
