@@ -22,8 +22,8 @@ This project performs real-time emotion recognition from audio input and visuali
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/emotion-recognition-visualization.git
-cd emotion-recognition-visualization
+git clone https://github.com/zero-0x01/Echomotion.git
+cd Echomotion
 ```
 
 ### 2. Configure Environment Variables
