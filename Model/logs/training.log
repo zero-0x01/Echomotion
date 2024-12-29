@@ -1,0 +1,12 @@
+2024-12-29 13:50:38,489:INFO:Extracted Features Shape: (8248, 52)
+2024-12-29 13:50:38,489:INFO:Labels Shape: (8248,)
+2024-12-29 13:50:38,575:INFO:Training Set Shape: (5773, 52), (5773, 4)
+2024-12-29 13:50:38,575:INFO:Validation Set Shape: (1237, 52), (1237, 4)
+2024-12-29 13:50:38,575:INFO:Test Set Shape: (1238, 52), (1238, 4)
+2024-12-29 13:50:38,576:ERROR:An error occurred: File not found: filepath=models/best_model.keras. Please ensure the file is an accessible `.keras` zip file.
+2024-12-29 13:55:38,960:INFO:Extracted Features Shape: (8248, 52)
+2024-12-29 13:55:38,961:INFO:Labels Shape: (8248,)
+2024-12-29 13:55:39,061:INFO:Training Set Shape: (5773, 52), (5773, 4)
+2024-12-29 13:55:39,061:INFO:Validation Set Shape: (1237, 52), (1237, 4)
+2024-12-29 13:55:39,061:INFO:Test Set Shape: (1238, 52), (1238, 4)
+2024-12-29 13:55:39,062:ERROR:An error occurred: File not found: filepath=models/best_model.keras. Please ensure the file is an accessible `.keras` zip file.

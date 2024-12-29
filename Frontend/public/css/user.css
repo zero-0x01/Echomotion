@@ -1,0 +1,217 @@
+/* General Body Styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #121212;
+    color: #e0e0e0;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    background-image: url("/assets/userback.jpg");
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
+
+/* Dimmed Background Overlay */
+.background-dim {
+    position: fixed; /* Covers the entire viewport */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Darker overlay for contrast */
+    z-index: 1;
+}
+
+/* Container Styles for the Main Content */
+.container {
+    width: 400px;
+    padding: 25px;
+    background-color: rgba(0, 0, 0, 0.7); /* Dark transparent background */
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 10%;
+}
+
+/* Title Styling */
+h1 {
+    font-size: 24px;
+    font-weight: 500;
+    color: #fff;
+    margin-bottom: 20px;
+}
+
+/* Profile Icon and Dropdown Menu */
+.profile-container {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+}
+
+.profile-icon {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background-color: #3a3333;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.profile-icon:hover {
+    transform: scale(1.1);
+}
+
+.profile-icon img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Profile Dropdown */
+.dropdown {
+    position: absolute;
+    top: 50px;
+    right: 0;
+    width: 150px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    opacity: 0;
+    transform: scaleY(0);
+    transform-origin: top center;
+    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease;
+    z-index: 1;
+}
+
+.dropdown.active {
+    opacity: 1;
+    transform: scaleY(1);
+    pointer-events: auto;
+}
+
+.dropdown-item {
+    padding: 10px 15px;
+    color: #333;
+    font-size: 14px;
+    text-decoration: none;
+    display: block;
+    transition: background-color 0.3s ease;
+}
+
+.dropdown-item:hover {
+    background-color: #f5f5f5;
+}
+
+/* Input Wrapper */
+.input-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 30px;
+}
+
+/* Text Input (disabled by default) */
+input[type="text"] {
+    width: 100%;
+    padding: 15px 45px;
+    font-size: 16px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    border-radius: 30px;
+    box-sizing: border-box;
+    cursor: not-allowed; /* Text writing disabled by default */
+    transition: all 0.3s ease;
+}
+
+/* Button Styles */
+button {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background-color: #444;
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button:hover {
+    background-color: #555;
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+/* Voice Upload Icon */
+.voice-upload {
+    left: 10px;
+}
+
+/* Submit Button */
+.submit-btn {
+    right: 10px;
+    background-color: #6200ea;
+}
+
+.submit-btn:hover {
+    background-color: #3700b3;
+}
+
+/* Emotion Result */
+#emotionResult {
+    margin-top: 20px;
+    color: #81c784;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+/* File Upload and Icon */
+input[type="file"] {
+    display: none;
+}
+
+label {
+    cursor: pointer;
+    background-color: #444;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 50px;
+    display: inline-block;
+    margin: 10px;
+    text-align: center;
+    transition: background-color 0.3s ease;
+}
+
+label:hover {
+    background-color: #555;
+}
+
+.label-icon {
+    font-size: 20px;
+}
+
+/* Adding a smooth transition effect on the input fields and buttons */
+input[type="text"], .voice-upload, .submit-btn, label {
+    transition: all 0.3s ease;
+}
+

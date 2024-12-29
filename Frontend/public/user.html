@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Recognition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        /* General Body Styles */
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-image: url("/assets/userback.jpg");
+            /* Use your image path */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #ffffff;
+        }
+
+        /* Dimmed Background */
+        .background-dim {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 0;
+        }
+
+        /* Container Styles */
+        .container {
+            position: relative;
+            z-index: 1;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 20px 30px;
+            width: 450px;
+            text-align: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        /* Profile Icon */
+        .profile-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        .profile-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #555;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .profile-icon:hover {
+            background-color: #777;
+            transform: scale(1.1);
+        }
+
+        /* Dropdown */
+        .dropdown {
+            display: none;
+            position: absolute;
+            top: 50px;
+            left: 0;
+            background-color: #333;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            width: 150px;
+            text-align: left;
+            z-index: 10;
+        }
+
+        .dropdown.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 10px 15px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            display: block;
+        }
+
+        .dropdown-item:hover {
+            background-color: #444;
+        }
+
+        /* Input Field */
+        input[type="text"] {
+            width: 100%;
+            padding: 10px 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: 20px;
+            background-color: #222;
+            color: #ffffff;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        input[type="text"]::placeholder {
+            color: #aaa;
+        }
+
+        /* Buttons */
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 120px;
+            /* Increase width */
+            height: 60px;
+            /* Increase height */
+            font-size: 24px;
+            /* Increase font size for icons */
+            border: none;
+            border-radius: 10%;
+            /* Keep buttons circular */
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            margin: 5px 10px;
+        }
+
+        .button i {
+            margin-right: 8px;
+        }
+
+        .voice-upload {
+            background-color: #6200ea;
+            color: #fff;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+
+        .voice-upload.recording {
+            background-color: #e53935;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(229, 57, 53, 0.4);
+            }
+
+            70% {
+                transform: scale(1.1);
+                box-shadow: 0 0 30px 10px rgba(229, 57, 53, 0);
+            }
+
+            100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(229, 57, 53, 0);
+            }
+        }
+
+        .upload-file {
+            background-color: #444;
+            color: #fff;
+            margin-bottom: 15px;
+        }
+
+        .upload-file:hover {
+            background-color: #555;
+            transform: scale(1.05);
+        }
+
+        .submit-btn {
+            background-color: #03dac6;
+            color: #000;
+        }
+
+        .submit-btn:hover {
+            background-color: #00bfa5;
+            transform: scale(1.05);
+        }
+
+        /* Emotion Result */
+        #emotionResult {
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #81c784;
+        }
+
+        /* Recording Indicator */
+        .recording-indicator {
+            margin-top: 10px;
+            font-size: 16px;
+            color: #e53935;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+
+        .recording-indicator.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="background-dim"></div>
+    <div class="profile-container">
+        <div class="profile-icon" onclick="toggleDropdown()">
+            <i class="fas fa-user"></i>
+        </div>
+        <div id="profile-dropdown" class="dropdown">
+            <div class="dropdown-item">Account</div>
+            <div class="dropdown-item" id="logout-button" style="cursor: pointer;">Logout</div>
+        </div>
+    </div>
+    <div class="container">
+        <!-- Profile Icon -->
+
+
+        <!-- Title -->
+        <h1>Emotion Recognition</h1>
+
+        <!-- Input Area -->
+        <input type="text" id="chatInput" placeholder="Type your message..." disabled>
+
+        <!-- Buttons -->
+        <button class="button voice-upload" onclick="startRecording()">
+            <i class="fas fa-microphone"></i>
+        </button>
+        <label for="audioFileInput" class="button upload-file">
+            <i class="fas fa-upload"></i>
+        </label>
+        <input type="file" id="audioFileInput" accept="audio/*" onchange="uploadFile()" style="display: none;">
+        <button class="button submit-btn" onclick="submitMessage()">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+
+        <!-- Emotion Result -->
+        <div id="emotionResult"></div>
+
+        <!-- Recording Indicator -->
+        <div id="recordingIndicator" class="recording-indicator">Recording...</div>
+    </div>
+
+    <!-- Font Awesome -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/js/all.min.js"
+        crossorigin="anonymous"></script>
+
+
+    <!-- Scripts -->
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // Toggle Profile Dropdown
+        function toggleDropdown() {
+            const dropdown = document.getElementById("profile-dropdown");
+            dropdown.classList.toggle("active");
+        }
+
+        // Start/Stop Recording
+        async function startRecording() {
+            const recordButton = document.querySelector(".voice-upload");
+            const recordingIndicator = document.getElementById("recordingIndicator");
+            const recordIcon = recordButton.querySelector("i");
+
+            if (isRecording) {
+                // Stop recording
+                mediaRecorder.stop();
+                isRecording = false;
+
+                // Update UI
+                recordButton.classList.remove("recording");
+                recordIcon.classList.remove("fa-stop");
+                recordIcon.classList.add("fa-microphone");
+                recordingIndicator.classList.remove("active");
+                return;
+            }
+
+            try {
+                // Start recording
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+                    uploadAudio(audioBlob);
+                    audioChunks = [];
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+
+                // Update UI
+                recordButton.classList.add("recording");
+                recordIcon.classList.remove("fa-microphone");
+                recordIcon.classList.add("fa-stop");
+                recordingIndicator.classList.add("active");
+            } catch (error) {
+                console.error("Error accessing microphone:", error);
+                alert("Microphone access is required to record audio.");
+            }
+        }
+
+        // Upload Recorded Audio
+        async function uploadAudio(audioBlob) {
+            const formData = new FormData();
+            formData.append("audio", audioBlob, "recording.wav");
+
+            try {
+                const response = await fetch("/api/predict-emotion", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById("emotionResult").textContent = `Emotion detected: ${result.predicted_emotion}`;
+                } else {
+                    document.getElementById("emotionResult").textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                console.error("Error uploading audio:", error);
+                document.getElementById("emotionResult").textContent = "Error uploading audio.";
+            }
+        }
+
+        // Upload File (Selected from File Input)
+        async function uploadFile() {
+            const fileInput = document.getElementById("audioFileInput");
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("No file selected!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("audio", file);
+
+            try {
+                const response = await fetch("/api/predict-emotion", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    document.getElementById("emotionResult").textContent = `Emotion detected: ${result.predicted_emotion}`;
+                } else {
+                    document.getElementById("emotionResult").textContent = `Error: ${result.error}`;
+                }
+            } catch (error) {
+                console.error("Error uploading file:", error);
+                document.getElementById("emotionResult").textContent = "Error uploading file.";
+            }
+        }
+
+        // Submit Text Message (Placeholder Functionality)
+        function submitMessage() {
+            const input = document.getElementById("chatInput");
+            if (input.disabled) {
+                alert("Text input is disabled. Please enable it to type.");
+            } else {
+                alert("Message submitted: " + input.value);
+            }
+        }
+    </script>
+    <script>
+        document.getElementById('logout-button').addEventListener('click', function () {
+            fetch('/api/logout', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+                .then(response => {
+                    if (response.ok) {
+                        // Redirect to login page or show a success message
+                        window.location.href = '/login';
+                    } else {
+                        // Handle error
+                        alert('Logout failed');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Logout failed');
+                });
+        });
+    </script>
+
+    <!-- Add FontAwesome for icons -->
+    <script src="https://kit.fontawesome.com/664eb5f53b.js" crossorigin="anonymous"></script>
+</body>
+
+</html>

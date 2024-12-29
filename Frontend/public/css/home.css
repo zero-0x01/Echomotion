@@ -1,0 +1,62 @@
+body {
+    font-family: Arial, sans-serif;
+    color: #e0e0e0;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    position: relative;
+    overflow: hidden;
+    background-image: url("/assets/Background.jpg");
+    background-size: cover;
+}
+
+.background-dim {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent black */
+    z-index: 1; /* Places it behind the content */
+}
+
+.container {
+    position: absolute; /* Places the container above the dim background */
+    z-index: 2; /* Higher z-index ensures it's above the dim layer */
+    width: 90%;
+    max-width: 800px;
+    bottom: 300px;
+    left: 60px;
+}
+
+h1 {
+    font-size: 4rem; /* Bigger font size for the header */
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+p {
+    font-size: 1.5rem; /* Bigger font size for the paragraph */
+    color: #b0b0b0;
+    max-width: 600px;
+    margin-left: 0px;
+}
+
+.button {
+    background-color: #0d8cff;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    border-radius: 10px; /* Rounded corners for the button */
+    margin-top: 30px;
+    transition: all 0.3s ease;
+    text-decoration: none; /* Removes the default link underline */
+    display: inline-block; /* Makes the link behave like a button */
+    text-align: center;
+}
+
+.button:hover {
+    background-color: #005bb5;
+}

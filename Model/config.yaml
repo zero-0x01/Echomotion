@@ -1,0 +1,53 @@
+# config.yaml
+data:
+  dataset_path: 'Datasets/Turev'
+  sample_rate: 16000
+  n_mfcc: 13
+  feature_extraction:
+    include_delta: true
+    include_delta_delta: true
+    additional_features:
+      pitch: true
+      energy: true
+      zcr: true
+      spectral_contrast: true
+      mel_spectrogram: true
+
+model:
+  input_shape: null  # To be set dynamically
+  conv_layers:
+    - filters: 64
+      kernel_size: 3
+      activation: 'relu'
+      pool_size: 2
+    - filters: 128
+      kernel_size: 3
+      activation: 'relu'
+      pool_size: 2
+  lstm_units: 128
+  dense_units: 128
+  dropout_rate: 0.5
+  output_activation: 'sigmoid'
+  loss: 'binary_crossentropy'
+  optimizer:
+    type: 'Adam'
+    learning_rate: 0.001
+
+training:
+  test_size: 0.3
+  validation_split: 0.5
+  batch_size: 32
+  epochs: 50
+  early_stopping:
+    monitor: 'val_loss'
+    patience: 10
+    restore_best_weights: true
+
+deployment:
+  model_save_path: 'models/emotion_recognition_model_turev'
+  label_encoder_save_path: 'models/label_encoder_classes_turev.npy'
+  preprocessing_save_path: 'models/preprocessing_pipeline.joblib'
+
+logging:
+  level: 'INFO'
+  file: 'logs/training.log'

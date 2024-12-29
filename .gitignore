@@ -1,0 +1,20 @@
+# Python
+Backend/venv/
+Model/__pycache__/
+Model/.env
+
+# Data and Model files
+Model/Datasets/
+Model/venv/
+Model/*.h5
+Model/*.pth
+
+# OS and Editor Specific
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Node.js
+Frontend/node_modules/
+Frontend/.env
