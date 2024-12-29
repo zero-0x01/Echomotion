@@ -14,9 +14,8 @@ import io
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask App
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'Echomotion123' 
+app.config['SECRET_KEY'] = 'Your_Secret' 
 
 # Initialize SocketIO with Gevent
 socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")  
@@ -31,7 +30,7 @@ except Exception as e:
     logger.error(f"Error loading models: {e}")
     raise e  
 
-# Configuration (Ensure this matches your training configuration)
+# Configuration
 config = {
     'data': {
         'sample_rate': 16000,
@@ -55,7 +54,7 @@ def extract_features_from_audio(audio, sr, config, scaler=None):
     try:
         # Extract MFCCs
         mfccs = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=config['data']['n_mfcc'], n_fft=2048)
-        logger.info(f"Extracted MFCCs: {mfccs.shape}")  # Should be (n_mfcc, t)
+        logger.info(f"Extracted MFCCs: {mfccs.shape}") 
 
         # Include delta and delta-delta features
         if config['data']['feature_extraction']['include_delta']:
@@ -69,7 +68,7 @@ def extract_features_from_audio(audio, sr, config, scaler=None):
 
         # Mean of MFCCs across time frames
         mfccs_mean = np.mean(mfccs, axis=1)
-        logger.info(f"MFCCs mean shape: {mfccs_mean.shape}")  # Should be (n_mfcc*3,)
+        logger.info(f"MFCCs mean shape: {mfccs_mean.shape}")
 
         # Additional Features
         fe_config = config['data']['feature_extraction']
@@ -111,13 +110,13 @@ def extract_features_from_audio(audio, sr, config, scaler=None):
 
         # Combine all features
         features = np.hstack((mfccs_mean, additional_features))
-        logger.info(f"Combined feature vector shape: {features.shape}")  # Should be (190,)
+        logger.info(f"Combined feature vector shape: {features.shape}")
 
         # Log feature vector size before scaling
         logger.info(f"Feature vector size before scaling: {len(features)}")
 
         # Define expected feature size
-        expected_feature_size = config['data'].get('expected_feature_size', 190)  # Updated to 190
+        expected_feature_size = config['data'].get('expected_feature_size', 190)  
 
         # Ensure the feature size matches the expected size by the StandardScaler
         actual_feature_size = len(features)
@@ -167,7 +166,7 @@ def process_audio(audio_bytes):
             features = preprocessing_pipeline.transform([features])
 
             # Predict Emotion Probabilities
-            predictions = model.predict(features)[0]  # Get the first (and only) prediction
+            predictions = model.predict(features)[0]
 
             # Map Probabilities to Emotions
             detected_emotions = {label_classes[i]: float(predictions[i]) for i in range(len(label_classes))}
