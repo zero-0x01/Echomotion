@@ -31,3 +31,6 @@ cd Echomotion
 python main.py
 ```
 this will install all dependecies and run both backend and frontend.
+
+### 3. Visit Site
+open the 127.0.0.1:5001 , and you good to go
