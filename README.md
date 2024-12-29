@@ -1,7 +1,6 @@
 # 🎵 Real-Time Audio Emotion Recognition and Visualization 🌟
 
 This project performs real-time emotion recognition from audio input and visualizes emotions with a dynamic 3D interface. Using advanced deep learning techniques and frontend-backend integration, it enables users to analyze emotions from audio with an engaging and interactive interface.
-[Demo Link](https://www.example.com)
 
 ---
 
